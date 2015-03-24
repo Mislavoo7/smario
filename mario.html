@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+canvas  {
+    background-image: url("background.jpg");
+    background-color: #cccccc;
+    background-size: 1200px 1300px;
+
+}
+</style>
+</head>
+<body>
+<audio autoplay loop>
+  <source src="audio.mp3" type="audio/mpeg">
+Your browser does not support the audio element.
+</audio>
+
+<canvas id="canvas" width="1200" height="700"></canvas>
+<script>
+var canvas = document.getElementById('canvas');
+var context = canvas.getContext('2d');
+var imageObj = new Image();  //slika svih likova
+var background = new Image();
+
+var game=true;		//ugasi se ako mario umre
+
+var frames=0;		//framesi se broje
+
+/*MARIO SE KRECE*/
+var kretanje= false, 
+    lijevo_desno= 0,
+    jump=false,
+    brzina=6,
+    gleda=0;
+
+var pozicija_gljive=0; //koji ce array biti up ili bad gljiva
+
+var map = []; // tu ću puniti key kodove koje domijem kad stisnem tipku (kad stisnem postanu true, a pusti onda false)
+onkeydown = onkeyup = function(e){
+	e = e || event; // event zbog internet exp
+	map[e.keyCode] = e.type == 'keydown';
+
+	if (map[37] && map[38] && game) {
+		kretanje=true;
+		lijevo_desno=-15; 
+		jump=true;
+		gleda=1;}
+
+	else if (map[38] && map[39] && game) {	
+		kretanje=true;
+		lijevo_desno=15;
+		jump=true;
+		gleda=0;}
+
+	else if (map[37] && game) {
+		kretanje=true; 
+		lijevo_desno=-15;
+		gleda=1;}
+
+	else if (map[38] && game) {
+		jump=true;}
+
+	else if (map[39] && game) {
+		kretanje=true;
+		lijevo_desno=15;
+		gleda=0;}
+	else {	kretanje=false;}
+}
+
+function drawImage(imageObj){   //jednom se pozove pomocu onload
+
+/*OBJEKTI*/
+var mario = {	sx: [0, 118, 230, 352, 473, 604, 717, 845, 966, 1880, 1160],	//pocetne pozicije x, zadnja pozicija je skok
+		sy: [5, 139],
+		sw: imageObj.width/11,						//tek se u funkciji drawImage slika potpuno loudala pa mogu vidjeti width
+		sh: 128,
+		dx: 200,				
+		dy: -100,
+		dw: imageObj.width/11,
+		dh: 128,
+		animator: 0,
+		dira_pod: false,
+		life: 3,
+		visina_skoka: 0,
+		novci: 0
+};
+
+var zid= {	sx: 613,
+		sy: 309,
+		sw: 100,
+		sh: 100,
+		pozicija: [[0, 620], [100, 620], [200, 620], [300, 620], [400, 620], [500, 520], [600, 420], /*rupa, rupa*/ [900, 620], [1000,620], [1100,620], [1200, 620], [1300, 620], [1400, 620], [1500,620], [1600,620], [1700, 620], [1800, 620], [1900, 620], [2000, 620], [2100,620], [2200, 620], [2300, 620], [2400, 620], [2500, 620], [2600, 620], [2700, 620], [2800, 620], [200, 200] ], /*POD*/ 
+		dw: 100,
+		dh: 100,
+		vidljiv: true
+};
+
+var coin= {	sx: 505,
+		sy: 300,
+		sw: 95,
+		sh: 128,
+		dx: [240, 495, 750],
+		dy: [490, 250, 10],
+		dw: 95,
+		dh: 128,
+		pokupljen: [false, false, false],
+};
+
+var goomba= {	sx: [135, 256, 381],
+		sy: 311,
+		sw: 118,
+		sh: 119,
+		dx: 1400,
+		dy: 200,
+		dw: 118,
+		dh: 119,
+		life: true,
+		animator: 0,
+		hoda: 20,
+		dira_pod: false,
+		mrtav: []
+};
+
+var pipe= {	sx: 730,
+		sy: 300,
+		sw: 137,
+		sh: 152,
+		dx: [1400, 1560, 1720, 1880, 2040],
+		dy: 0,
+		dw: 160,
+		dh: 152
+};
+
+var upitnik= {	sx: [13, 1165],
+		sy: [320, 306],
+		sw: 100,
+		sh: 100,
+		dx: [300, 2400],
+		dy: 200,
+		dw: 100,
+		dh: 100,
+		udaren: [false, true]
+};
+
+var up= {	sx: 1017,
+		sy: 302,
+		sw: 124,
+		sh: 117,
+		dx: [300, 2400],
+		dy: 100,
+		dw: 124,
+		dh: 117,
+		dira_pod: false,
+		life: false,
+		udario: false
+};
+
+var bad= {	sx: 897,
+		sy: 305,
+		sw: 120,
+		sh: 109,
+		dx: [300, 2400],
+		dy: 100,
+		dw: 120,
+		dh: 109,
+		dira_pod: false,
+		life: false
+};
+
+var bcg1= {	sx: 15,
+		sy: 450,
+		sw: 155,
+		sh: 172,
+		dx: 700,
+		dy: 200,
+		dw: 620,
+		dh: 688
+};
+
+	function animationframe() {  //onload je napravi prvi requestanimation frame onda se funkcija stalno sama izvrsi 
+/*MARIO i OKOLINA*/
+
+		var camera=mario.dx*(-1)+canvas.width/2-200;	//prati marija
+
+		//mario se OKRENE lijevo ili desno i KAMERA ga prati 
+		if (kretanje) {	mario.dx=mario.dx+lijevo_desno;
+				if(gleda==0) camera=mario.dx*(-1)+canvas.width/2-200;
+				if(gleda==1) camera=mario.dx*(-1)+canvas.width/2-200;
+				}
+		else {	if (gleda==0) mario.animator= 0;
+			if (gleda==1) mario.animator= 8;}
+
+		//kada mario SKACE i koliko visoko (moram paziti da skace do odredene visine i da ne moze u zraku skakati)
+		if (jump && mario.visina_skoka<12 && mario.dira_pod) {
+			mario.animator= 10;
+			mario.dy-=20; 
+			mario.visina_skoka++;} 
+		else {	jump=false;
+			mario.visina_skoka=0;} 
+
+		//sto se dogodi ako padne u RUPU, izgubi jedan zivot i vrati se na start (kamera isto)
+		if (mario.dy+mario.dh>=canvas.height) {mario.life=mario.life-1; mario.dy=-100; mario.dx=200; camera=mario.dx*(-1)+canvas.width/2-200;}
+
+		//ako ne dira pod PADA
+		if (mario.dira_pod==false) mario.dy=mario.dy+20;
+
+		/*dok ne dira pod je false. kada se sudari s kockom onda je true. u iducem izvrsavanju funkcije mario ne pada ali ni ne dira pod dok ne 		provjeri dali je bilo sudara s kockom */		
+		if(jump==false) mario.dira_pod=false;
+
+		//ugasi igru kada zivoti padnu na 0
+		if (mario.life<=0) {game=false; mario.life=0;}
+
+		//ozivi goombu iz random cijevi
+		var rando= Math.floor(Math.random()*5); //cijeli broj između 0 i 4 (cijevi)
+		var arry=[1430, 1590, 1750, 1910, 2070];  //cca pozicija cijevi
+    		if (goomba.life==false && game) {
+		goomba.dx=arry[rando];		//vrati gombu u neku od pozicija
+		goomba.dy=0;
+		goomba.life=true;
+		}
+
+		//ako goomba ne dira pod PADA
+		if (goomba.dira_pod==false) goomba.dy=goomba.dy+10;
+
+		//goomba HODA
+		if (goomba.dira_pod && goomba.life) goomba.dx=goomba.dx-10;
+
+		//svaki put se zapita dali dira pod
+		goomba.dira_pod=false;
+
+		//goomba padne u rupu
+		if (goomba.dy+goomba.dh>=canvas.height) goomba.life=false; 
+		
+		context.clearRect(0,0,canvas.width, canvas.height); 	//da ne bi isla slika preko slike obrise se prosla 
+/*CRTACI*/	
+		context.drawImage(	imageObj,  
+					bcg1.sx,
+					bcg1.sy,
+					bcg1.sw,		//koju velicinu od SPRITEA ce uzeti
+					bcg1.sh, 		//isto i visinu
+					bcg1.dx+camera/6,	//x pozicija na CANVASU u koji se crta sx
+					bcg1.dy, 		//y pozicija na CANVASU u koji se crta sx
+					bcg1.dw, 		//spljosti ili rastegne sliku u CANVASU
+					bcg1.dh);
+
+		if (game){
+		context.drawImage(	imageObj,  
+					mario.sx[mario.animator],	//x piksle na SPRITEU od kojeg ce poceti slika za canvas 
+					mario.sy[gleda], 		//y piksle na SPRITEU od kojeg ce poceti slika za canvas
+					mario.sw,			//koju velicinu od SPRITEA ce uzeti
+					mario.sh, 			//isto i visinu
+					mario.dx+camera,		//x pozicija na CANVASU u koji se crta sx
+					mario.dy, 			//y pozicija na CANVASU u koji se crta sx
+					mario.dw, 			//spljosti ili rastegne sliku u CANVASU
+					mario.dh);
+		}
+
+		context.drawImage(	imageObj,  
+					goomba.sx[goomba.animator],
+					goomba.sy,
+					goomba.sw,		//koju velicinu od SPRITEA ce uzeti
+					goomba.sh, 		//isto i visinu
+					goomba.dx+camera,	//x pozicija na CANVASU u koji se crta sx
+					goomba.dy, 		//y pozicija na CANVASU u koji se crta sx
+					goomba.dw, 		//spljosti ili rastegne sliku u CANVASU
+					goomba.dh);
+
+		for (p=0; p<pipe.dx.length; p++) {			//nacrta sve cijevi		
+			context.drawImage(	imageObj,  
+						pipe.sx,
+						pipe.sy,
+						pipe.sw,		//koju velicinu od SPRITEA ce uzeti
+						pipe.sh, 		//isto i visinu
+						pipe.dx[p]+camera,	//x pozicija na CANVASU u koji se crta sx
+						pipe.dy, 		//y pozicija na CANVASU u koji se crta sx
+						pipe.dw, 		//spljosti ili rastegne sliku u CANVASU
+						pipe.dh);
+		}
+
+		for (x=0; x<zid.pozicija.length; x++) {		//goomba se crta i puta (kao i coin) ali animira ga goomba.animator
+					
+				if (	goomba.dx+40 < zid.pozicija[x][0] + zid.dw &&    //GOOMBA vs ZID, svaki goomba ima svoj dy premda su isti...
+					goomba.dx + goomba.dw > zid.pozicija[x][0]+15 && //...kako bi se moglo provjeriti dali je mario skocio na svaki
+					goomba.dy < zid.pozicija[x][1] + zid.dh && 
+					goomba.dh + goomba.dy > zid.pozicija[x][1]) {
+
+						goomba.dira_pod=true;
+				}
+
+				if (	mario.dx <= goomba.dx+40 + goomba.dw-40 && //sudar maria i goombe (+40) jer sam na mario2.png mjerio od goombine noge
+					mario.dx + mario.dw >= goomba.dx+40 && //a to znaci da reagira na veliki kvadrat s puno praznog prostora
+					mario.dy <= goomba.dy + goomba.dh && 
+					mario.dh + mario.dy >= goomba.dy &&
+					game && goomba.life) {
+				
+						if (mario.dy+110<= goomba.dy) {
+							goomba.life=false; //umro goomba
+							goomba.mrtav.push(goomba.dx);//doda poziciju goombe u array
+
+							coin.dx.push(goomba.dx); //doda novi novcic u array
+							coin.dy.push(200);
+							coin.pokupljen.push(false);
+						}
+						else {mario.life=mario.life-1; mario.dy=-100; mario.dx=200; camera=mario.dx*(-1)+canvas.width/2-200;}//-zivot
+				}
+				
+			if (	mario.dx+35 < zid.pozicija[x][0] + zid.dw && 	//MARIO vs ZID
+				mario.dx + mario.dw > zid.pozicija[x][0]+40 && 	
+				mario.dh + mario.dy > zid.pozicija[x][1] &&
+				mario.dy<zid.pozicija[x][1]+zid.dh) {					//dok ne skace se sudara sa zidom
+					if (jump==false) mario.dira_pod=true;
+					if (mario.dy == zid.pozicija[x][1] + 80) {
+						jump=false;
+						mario.visina_skoka=0;
+						mario.dira_pod=false;
+						mario.dy=mario.dy+20;							
+					} 
+					if(	mario.dx+mario.dw>=zid.pozicija[5][0]+30 && 		//kocke koje nisu pod (mozda napravi konstruktor)
+						mario.dy+mario.dh>=zid.pozicija[5][1]+10 &&
+						mario.dx<=zid.pozicija[5][0]+zid.dw &&
+						mario.dy<=zid.pozicija[5][1]+zid.dh) {
+							if (gleda==0) mario.dx=mario.dx-15;  //da ne moze proci kroz sredinu kocke
+							if (gleda==1) mario.dx=mario.dx+15;}
+
+					if(	mario.dx+mario.dw>=zid.pozicija[6][0]+30 && 
+						mario.dy+mario.dh>=zid.pozicija[6][1]+10 &&
+						mario.dx<=zid.pozicija[6][0]+zid.dw &&
+						mario.dy<=zid.pozicija[6][1]+zid.dh) {
+							if (gleda==0) mario.dx=mario.dx-15;
+							if (gleda==1) mario.dx=mario.dx+15;}
+	
+					if(	mario.dx+mario.dw>=zid.pozicija[27][0]+30 && 
+						mario.dy+mario.dh>=zid.pozicija[27][1]+10 &&
+						mario.dx<=zid.pozicija[27][0]+zid.dw &&
+						mario.dy<=zid.pozicija[27][1]+zid.dh) {
+							if (gleda==0) mario.dx=mario.dx-15;
+							if (gleda==1) mario.dx=mario.dx+15;}
+
+			}
+
+			var up_vs_bad=0;
+
+			if (	mario.dx+35 < upitnik.dx[0] + upitnik.dw && 	//prvi UPITNIK
+				mario.dx + mario.dw > upitnik.dx[0]+40 && 	
+				mario.dh + mario.dy > upitnik.dy &&
+				mario.dy<upitnik.dy+upitnik.dh) {					
+					if (jump==false) mario.dira_pod=true;
+					if (mario.dy == upitnik.dy + 80) {
+						jump=false;
+						mario.visina_skoka=0;
+						mario.dira_pod=false;
+						mario.dy=mario.dy+20;
+						if (upitnik.udaren[0]==false) {
+						up_vs_bad = Math.random();		//random stavi dobru ili losu gljivu
+						if (up_vs_bad<0.3) {
+							up.life=true; 
+							up.dx[0]=300;
+							up.dy=100;
+							bad.life=false; 
+							pozicija_gljive=0;} //na prvom su cesce lose gljive
+						else {	bad.life=true;
+							bad.dx[0]=300;
+							bad.dy=100; 
+							pozicija_gljive=0;}
+						upitnik.udaren[0]=true;			//zamijeni upitnike
+						}
+						upitnik.udaren[1]=false;
+					} 
+
+					if(	mario.dx+mario.dw>=upitnik.dx[0]+30 && //da ne moze proci kroz sredinu upitnika
+						mario.dy+mario.dh>=upitnik.dy+10 &&
+						mario.dx<=upitnik.dx[0]+upitnik.dw &&
+						mario.dy<=upitnik.dy+upitnik.dh) {
+						
+							if (gleda==0) mario.dx=mario.dx-15;
+							if (gleda==1) mario.dx=mario.dx+15;}
+			}
+
+			if (	mario.dx+35 < upitnik.dx[1] + upitnik.dw && 	//drugi UPITNIK
+				mario.dx + mario.dw > upitnik.dx[1]+40 && 	
+				mario.dh + mario.dy > upitnik.dy &&
+				mario.dy<upitnik.dy+upitnik.dh) {					
+					if (jump==false) mario.dira_pod=true;
+					if (mario.dy == upitnik.dy + 80) {
+						jump=false;
+						mario.visina_skoka=0;
+						mario.dira_pod=false;
+						mario.dy=mario.dy+20;
+						if(upitnik.udaren[1]==false){
+						up_vs_bad = Math.random();		//random stavi dobru ili losu gljivu
+						if (up_vs_bad<0.5) {
+							up.life=true; 
+							up.dx[1]=2400;
+							up.dy=100;
+							bad.life=false; pozicija_gljive=1;} //ovdije su sanse 50:50
+						else {	bad.life=true; 
+							bad.dx[1]=2400;
+							bad.dy=100;
+							up.life=false; 
+							pozicija_gljive=1;}
+						upitnik.udaren[1]=true;			//zamijeni upitnike
+						}
+						upitnik.udaren[0]=false;
+					} 
+
+					if(	mario.dx+mario.dw>=upitnik.dx[1]+30 && 
+						mario.dy+mario.dh>=upitnik.dy+10 &&
+						mario.dx<=upitnik.dx[1]+upitnik.dw &&
+						mario.dy<=upitnik.dy+upitnik.dh) {
+						
+							if (gleda==0) mario.dx=mario.dx-15;
+							if (gleda==1) mario.dx=mario.dx+15;}
+			}
+
+
+			for (l=0; l<up.dx.length; l++) {				
+				if (	mario.dx+mario.dw>up.dx[l] && mario.dx<up.dx[l]+up.dw && 	//UP vs MARIO
+					mario.dy<up.dy+up.dh && mario.dy+mario.dh>up.dy && up.life) {
+						mario.life++;
+						up.life=false;}
+		
+				if (up.life) up.dy=up.dy+0.2;
+				if (up.dy>canvas.height) up.life=false;
+			}
+
+			for (b=0; b<bad.dx.length; b++) {			
+				if (	mario.dx+mario.dw>bad.dx[b] && mario.dx<bad.dx[b]+bad.dw && 	//BAD vs MARIO
+					mario.dy<bad.dy+bad.dh && mario.dy+mario.dh>bad.dy && bad.life) {
+						mario.life--;
+						bad.life=false;}
+		
+				if (bad.life) bad.dy=bad.dy+0.2;
+				if (bad.dy>canvas.height) bad.life=false;
+			}
+
+
+
+			context.drawImage(	imageObj,  		//nacrta sve X zidove gore je for loop
+						zid.sx,
+						zid.sy,
+						zid.sw,			//koju velicinu od SPRITEA ce uzeti
+						zid.sh, 		//isto i visinu
+						zid.pozicija[x][0]+camera,	//x pozicija na CANVASU u koji se crta sx
+						zid.pozicija[x][1], 		//y pozicija na CANVASU u koji se crta sx
+						zid.dw, 		//spljosti ili rastegne sliku u CANVASU
+						zid.dh);
+		} 							//tu je zavrsio taj for loop za zid i one koji dirjau zid
+
+		for (m=0; m<goomba.mrtav.length; m++) {		//tu crta sve mrtve goombe koji se nalaze i dodaju u array (zapamti gdje je zgazen)
+
+			context.drawImage(	imageObj,  
+						goomba.sx[2],
+						goomba.sy,
+						goomba.sw,		//koju velicinu od SPRITEA ce uzeti
+						goomba.sh, 		//isto i visinu
+						goomba.mrtav[m]+camera,	//x pozicija na CANVASU u koji se crta sx
+						510, 			//y pozicija na CANVASU u koji se crta sx
+						goomba.dw, 		//spljosti ili rastegne sliku u CANVASU
+						goomba.dh);
+		}
+
+		for (u=0; u<upitnik.dx.length; u++) {			//nacrta upitnike...
+			if (upitnik.udaren[u]){				//...boja ovisi o tome jesu li udareni ili ne
+				context.drawImage(	imageObj,  
+							upitnik.sx[1],
+							upitnik.sy[1],
+							upitnik.sw,		//koju velicinu od SPRITEA ce uzeti
+							upitnik.sh, 		//isto i visinu
+							upitnik.dx[u]+camera,	//x pozicija na CANVASU u koji se crta sx
+							upitnik.dy, 		//y pozicija na CANVASU u koji se crta sx
+							upitnik.dw, 		//spljosti ili rastegne sliku u CANVASU
+							upitnik.dh);
+			} else {
+				context.drawImage(	imageObj,  
+							upitnik.sx[0],
+							upitnik.sy[0],
+							upitnik.sw,		//koju velicinu od SPRITEA ce uzeti
+							upitnik.sh, 		//isto i visinu
+							upitnik.dx[u]+camera,	//x pozicija na CANVASU u koji se crta sx
+							upitnik.dy, 		//y pozicija na CANVASU u koji se crta sx
+							upitnik.dw, 		//spljosti ili rastegne sliku u CANVASU
+							upitnik.dh);
+			}
+		}
+
+		for (i=0; i<coin.dx.length; i++) {		//COINS: crta ih I puta, a kad se mario sudari s coin onda mu doda jedan NOVAC 
+			if (	mario.dx+mario.dw>coin.dx[i] && mario.dx<coin.dx[i]+mario.dw &&
+				mario.dy<coin.dy[i]+coin.dh && mario.dy+mario.dh>coin.dy[i]) {
+					if (coin.pokupljen[i]==false) mario.novci++;
+					coin.pokupljen[i]=true;}
+
+			if (coin.pokupljen[i]==false) {
+				context.drawImage(	imageObj,  
+							coin.sx,
+							coin.sy,
+							coin.sw,		//koju velicinu od SPRITEA ce uzeti
+							coin.sh, 		//isto i visinu
+							coin.dx[i]+camera,	//x pozicija na CANVASU u koji se crta sx
+							coin.dy[i], 		//y pozicija na CANVASU u koji se crta sx
+							coin.dw, 		//spljosti ili rastegne sliku u CANVASU
+							coin.dh);
+			}
+		}
+
+		if (up.life && bad.life==false) {
+				context.drawImage(	imageObj,  
+							up.sx,
+							up.sy,
+							up.sw,		//koju velicinu od SPRITEA ce uzeti
+							up.sh, 		//isto i visinu
+							up.dx[pozicija_gljive]+camera,	//x pozicija na CANVASU u koji se crta sx
+							up.dy, 		//y pozicija na CANVASU u koji se crta sx
+							up.dw, 		//spljosti ili rastegne sliku u CANVASU
+							up.dh);
+			}
+
+		if (bad.life && up.life==false) {
+				context.drawImage(	imageObj,  
+							bad.sx,
+							bad.sy,
+							bad.sw,		//koju velicinu od SPRITEA ce uzeti
+							bad.sh, 		//isto i visinu
+							bad.dx[pozicija_gljive]+camera,	//x pozicija na CANVASU u koji se crta sx
+							bad.dy, 		//y pozicija na CANVASU u koji se crta sx
+							bad.dw, 		//spljosti ili rastegne sliku u CANVASU
+							bad.dh);
+			}
+
+		context.beginPath();
+		context.font = "40px Courier New";
+		context.fillStyle = 'white';
+		context.fillText("COINS:", 10, 30);				//napiše NOVCE od maria
+		context.fillText(mario.novci, 180, 30);
+		context.stroke();
+
+		context.beginPath();
+		context.font = "40px Courier New";
+		context.fillStyle = 'white';
+		context.fillText("LIVES:", 1000, 30);				//napiše ZIVOTE od maria
+		context.fillText(mario.life, 1150, 30);
+		context.stroke();
+
+		if (game==false) {
+		context.beginPath();
+		context.font = "120px Courier New";
+		context.fillStyle = 'white';
+		context.fillText("GAME OVER", 200, canvas.height/2);		//napiše GAME OVER
+		context.stroke();
+		}
+/*ANIMATORI*/
+		if (frames==2) {
+			if (mario.animator<8)	mario.animator++; 
+			else 	mario.animator=0;
+
+			if (goomba.animator<1) goomba.animator++;
+			else	goomba.animator=0;
+
+		}
+		else if (frames>2) frames=0;
+
+		frames++;
+
+		window.requestAnimationFrame(animationframe); //ponovi funkciju
+	};
+	window.requestAnimationFrame(animationframe); //onload je napravio samo da se ovo izvrsi 
+};
+
+/*LOADA SLIKU*/
+imageObj.src = 'mario2.png';
+imageObj.onload = function() {	drawImage(this)};
+
+</script>
+</body>
+</html>
